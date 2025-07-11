@@ -19,10 +19,10 @@ from werkzeug.utils import secure_filename
 from sqlmodel import Field, Session, SQLModel, create_engine, select
 from typing import Optional, List
 
-# --- NEW IMPORT FOR JSONB TYPE ---
-from sqlalchemy import Column # Add this line
+# --- CRITICAL IMPORTS FOR JSONB TYPE ---
+from sqlalchemy import Column # NEW: For defining SQLAlchemy columns directly
 from sqlalchemy.dialects.postgresql import JSON # For JSONB column type in PostgreSQL
-# --- END NEW IMPORT ---
+# --- END CRITICAL IMPORTS ---
 
 # --- Custom LabColor class ---
 class LabColor:
@@ -974,8 +974,8 @@ class Report(SQLModel, table=True):
     op_number: str = Field(index=True) # For direct lookup by OP number
     original_image: str # Filename of the uploaded image
     report_filename: str # Filename of the generated PDF report
-    # FIX: Use type_=JSON for JSONB column type
-    detected_shades: dict = Field(default_factory=dict, sa_column=Field(type_=JSON)) # Store dict as JSONB in Postgres
+    # FIX: Use sa_column=Column(JSON) for JSONB column type directly
+    detected_shades: dict = Field(default_factory=dict, sa_column=Column(JSON)) # Store dict as JSONB in Postgres
     timestamp: datetime = Field(default_factory=datetime.now)
 
 # --- END Database Models ---
