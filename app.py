@@ -20,6 +20,7 @@ from sqlmodel import Field, Session, SQLModel, create_engine, select
 from typing import Optional, List
 
 # --- NEW IMPORT FOR JSONB TYPE ---
+from sqlalchemy import Column # Add this line
 from sqlalchemy.dialects.postgresql import JSON # For JSONB column type in PostgreSQL
 # --- END NEW IMPORT ---
 
