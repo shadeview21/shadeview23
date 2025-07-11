@@ -19,6 +19,10 @@ from werkzeug.utils import secure_filename
 from sqlmodel import Field, Session, SQLModel, create_engine, select
 from typing import Optional, List
 
+# --- NEW IMPORT FOR JSONB TYPE ---
+from sqlalchemy.dialects.postgresql import JSON # For JSONB column type in PostgreSQL
+# --- END NEW IMPORT ---
+
 # --- Custom LabColor class ---
 class LabColor:
     """A simple class to hold L*a*b* color values."""
@@ -91,7 +95,6 @@ def delta_e_cie2000(lab1: LabColor, lab2: LabColor):
     if C1_prime * C2_prime == 0:
         H_bar_prime = 0.0 # Ensure it's float
     else:
-        # delta_h_prime_rad = h2_rad - h1_rad # Not used directly in H_bar_prime calculation
         # H_bar_prime calculation as per standard Delta E 2000
         if np.abs(h1_rad - h2_rad) <= np.pi:
             H_bar_prime = (h1_rad + h2_rad) / 2.0
@@ -970,7 +973,8 @@ class Report(SQLModel, table=True):
     op_number: str = Field(index=True) # For direct lookup by OP number
     original_image: str # Filename of the uploaded image
     report_filename: str # Filename of the generated PDF report
-    detected_shades: dict = Field(default_factory=dict, sa_column=Field(json=True)) # Store dict as JSONB in Postgres
+    # FIX: Use type_=JSON for JSONB column type
+    detected_shades: dict = Field(default_factory=dict, sa_column=Field(type_=JSON)) # Store dict as JSONB in Postgres
     timestamp: datetime = Field(default_factory=datetime.now)
 
 # --- END Database Models ---
