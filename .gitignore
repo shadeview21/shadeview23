@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+*.env
+.idea/
+
+# Database
+database.db
+
+# Uploads (if they are temporary or user-generated)
+uploads/
+
+# Specific to your project
+shade_classifier_model.pkl

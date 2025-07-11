@@ -1,0 +1,225 @@
+{% extends 'layout.html' %}
+
+{% block content %}
+<div class="container bg-white p-8 rounded-xl shadow-lg w-full">
+    <h1 class="text-3xl font-bold text-center text-indigo-700 mb-6">Tooth Shade Analysis Report</h1>
+    <p class="text-center text-gray-600 mb-8">For Patient: <span class="font-semibold text-indigo-600">{{ patient_name }}</span></p>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <ul class="flash-messages">
+                {% for category, message in messages %}
+                    <li class="{{ category }}">{{ message }}</li>
+                {% endfor %}
+            </ul>
+        {% endif %}
+    {% endwith %}
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+        <!-- Report Details -->
+        <div class="bg-blue-50 p-6 rounded-lg border border-blue-200">
+            <h2 class="text-xl font-semibold text-blue-800 mb-4 flex items-center">
+                <i class="fas fa-info-circle mr-3 text-2xl"></i> Report Overview
+            </h2>
+            <p class="text-gray-700 mb-2"><strong>Analysis Date:</strong> {{ analysis_date }}</p>
+            <p class="text-gray-700 mb-2"><strong>Correction Method:</strong> {{ correction_method }}</p>
+            <p class="text-gray-700 mb-2"><strong>Color Reference Used:</strong> {{ reference_tab | replace('_', ' ') | title }}</p>
+            <p class="text-gray-700 mb-2"><strong>Report ID:</strong> <span class="font-mono text-sm text-gray-800">{{ report_id }}</span></p>
+            <a href="{{ url_for('download_report', filename=report_filename) }}" class="inline-block mt-4 btn-primary text-sm">
+                <i class="fas fa-download mr-2"></i> Download PDF Report
+            </a>
+        </div>
+
+        <!-- Uploaded Image -->
+        <div class="bg-gray-50 p-6 rounded-lg border border-gray-200 flex flex-col items-center justify-center">
+            <h2 class="text-xl font-semibold text-gray-800 mb-4 flex items-center">
+                <i class="fas fa-image mr-3 text-2xl"></i> Uploaded Image
+            </h2>
+            {% if image_filename %}
+                <img src="{{ url_for('uploaded_file', filename=image_filename) }}" alt="Uploaded Tooth Image" class="max-w-full h-auto rounded-lg shadow-md">
+            {% else %}
+                <p class="text-gray-600">No image uploaded or image not found.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Detected Shades Section -->
+    <div class="bg-indigo-50 p-6 rounded-lg border border-indigo-200 mb-8">
+        <h2 class="text-xl font-semibold text-indigo-800 mb-4 flex items-center">
+            <i class="fas fa-palette mr-3 text-2xl"></i> over all shade 
+        </h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div>
+                <h3 class="font-semibold text-lg text-indigo-700 mb-2">Rule-based Shades:</h3>
+                <p class="text-gray-700 mb-1"><strong>Incisal Zone:</strong> <span class="shade-result font-bold text-indigo-900">{{ shades.incisal | default('N/A') }}</span></p>
+                <p class="text-gray-700 mb-1"><strong>Middle Zone:</strong> <span class="shade-result font-bold text-indigo-900">{{ shades.middle | default('N/A') }}</span></p>
+                <p class="text-gray-700 mb-1"><strong>Cervical Zone:</strong> <span class="shade-result font-bold text-indigo-900">{{ shades.cervical | default('N/A') }}</span></p>
+            </div>
+            <div>
+                <h3 class="font-semibold text-lg text-indigo-700 mb-2">Delta E 2000 Matched Shades:</h3>
+                {# Safely get delta_e_matched_shades, defaulting to an empty dict if not present #}
+                {% set delta_e_shades = shades.delta_e_matched_shades | default({}) %}
+                <p class="text-gray-700 mb-1">
+                    <strong>Overall:</strong> <span class="shade-result font-bold text-indigo-900">{{ delta_e_shades.overall | default('N/A') }}</span>
+                    (dE: {% if delta_e_shades.overall_delta_e is number %}{{ "%.2f"|format(delta_e_shades.overall_delta_e) }}{% else %}N/A{% endif %})
+                </p>
+                <p class="text-gray-700 mb-1">
+                    <strong>Incisal:</strong> <span class="shade-result font-bold text-indigo-900">{{ delta_e_shades.incisal | default('N/A') }}</span>
+                    (dE: {% if delta_e_shades.incisal_delta_e is number %}{{ "%.2f"|format(delta_e_shades.incisal_delta_e) }}{% else %}N/A{% endif %})
+                </p>
+                <p class="text-gray-700 mb-1">
+                    <strong>Middle:</strong> <span class="shade-result font-bold text-indigo-900">{{ delta_e_shades.middle | default('N/A') }}</span>
+                    (dE: {% if delta_e_shades.middle_delta_e is number %}{{ "%.2f"|format(delta_e_shades.middle_delta_e) }}{% else %}N/A{% endif %})
+                </p>
+                <p class="text-gray-700 mb-1">
+                    <strong>Cervical:</strong> <span class="shade-result font-bold text-indigo-900">{{ delta_e_shades.cervical | default('N/A') }}</span>
+                    (dE: {% if delta_e_shades.cervical_delta_e is number %}{{ "%.2f"|format(delta_e_shades.cervical_delta_e) }}{% else %}N/A{% endif %})
+                </p>
+            </div>
+            <div>
+                <h3 class="font-semibold text-lg text-indigo-700 mb-2">Accuracy & Confidence:</h3>
+                {% set accuracy_conf = shades.accuracy_confidence | default({}) %}
+                <p class="text-gray-700 mb-1">
+                    <strong>Overall Confidence:</strong> <span class="font-bold text-indigo-900">{{ accuracy_conf.overall_percentage | default('N/A') }}%</span>
+                </p>
+                <p class="text-gray-700 text-sm italic">{{ accuracy_conf.notes | default('') }}</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Advanced AI Insights -->
+    <div class="bg-green-50 p-6 rounded-lg border border-green-200 mb-8">
+        <h2 class="text-xl font-semibold text-green-800 mb-4 flex items-center">
+            <i class="fas fa-brain mr-3 text-2xl"></i> Advanced AI Insights (Simulated)
+        </h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+                <h3 class="font-semibold text-lg text-green-700 mb-2">Tooth Analysis:</h3>
+                {% set tooth_analysis = shades.tooth_analysis | default({}) %}
+                <p class="text-gray-700 mb-1"><strong>Simulated Overall Shade:</strong> {{ tooth_analysis.simulated_overall_shade | default('N/A') }}</p>
+                <p class="text-gray-700 mb-1"><strong>Simulated Condition:</strong> {{ tooth_analysis.tooth_condition | default('N/A') }}</p>
+                <p class="text-gray-700 mb-1"><strong>Simulated Stain Presence:</strong> {{ tooth_analysis.stain_presence | default('N/A') }}</p>
+                <p class="text-gray-700 mb-1"><strong>Simulated Decay Presence:</strong> {{ tooth_analysis.decay_presence | default('N/A') }}</p>
+                {% set overall_lab_data = tooth_analysis.overall_lab | default({}) %}
+                <p class="text-gray-700 mb-1">
+                    <strong>Simulated Overall LAB:</strong> L={{ overall_lab_data.L | default('N/A') | round(2) }}, 
+                    a={{ overall_lab_data.a | default('N/A') | round(2) }}, 
+                    b={{ overall_lab_data.b | default('N/A') | round(2) }}
+                </p>
+            </div>
+            <div>
+                <h3 class="font-semibold text-lg text-green-700 mb-2">Facial Aesthetics Analysis:</h3>
+                {% set face_features = shades.face_features | default({}) %}
+                {% if face_features %}
+                    <p class="text-gray-700 mb-1"><strong>Skin Tone:</strong> {{ face_features.skin_tone | default('N/A') }}</p>
+                    <p class="text-gray-700 mb-1"><strong>Lip Color:</strong> {{ face_features.lip_color | default('N/A') }}</p>
+                    <p class="text-gray-700 mb-1"><strong>Eye Contrast:</strong> {{ face_features.eye_contrast | default('N/A') }}</p>
+                    <p class="text-gray-700 mb-1"><strong>Facial Harmony Score:</strong> {{ face_features.facial_harmony_score | default('N/A') }}</p>
+                {% else %}
+                    <p class="text-gray-700">Facial analysis data not available.</p>
+                {% endif %}
+            </div>
+        </div>
+        <div class="mt-6">
+            <h3 class="font-semibold text-lg text-green-700 mb-2">Aesthetic Shade Suggestion:</h3>
+            {% set aesthetic_suggestion = shades.aesthetic_suggestion | default({}) %}
+            {% if aesthetic_suggestion %}
+                <p class="text-gray-700 mb-1"><strong>Suggested Aesthetic Shade:</strong> {{ aesthetic_suggestion.suggested_aesthetic_shade | default('N/A') }}</p>
+                <p class="text-gray-700 mb-1"><strong>Aesthetic Confidence:</strong> {{ aesthetic_suggestion.aesthetic_confidence | default('N/A') }}</p>
+                <p class="text-gray-700 italic">{{ aesthetic_suggestion.recommendation_notes | default('') }}</p>
+            {% else %}
+                <p class="text-gray-700">Aesthetic suggestion data not available.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- EXIF Data Display (for debugging/info) -->
+    {% set exif_data = shades.exif_data | default({}) %}
+    {% if exif_data %}
+    <div class="bg-yellow-50 p-6 rounded-lg border border-yellow-200 mb-8">
+        <h2 class="text-xl font-semibold text-yellow-800 mb-4 flex items-center">
+            <i class="fas fa-info-circle mr-3 text-2xl"></i> EXIF Data (from Image Metadata)
+        </h2>
+        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 text-sm text-gray-700">
+            {% set display_tags = ['Make', 'Model', 'DateTimeOriginal', 'FNumber', 'ExposureTime', 'ISOSpeedRatings', 'Flash', 'WhiteBalance'] %}
+            {% set exif_found = false %}
+            {% for tag_name in display_tags %}
+                {% if tag_name in exif_data %}
+                    <p><strong>{{ tag_name }}:</strong> {{ exif_data[tag_name] }}</p>
+                    {% set exif_found = true %}
+                {% endif %}
+            {% endfor %}
+            {% if not exif_found %}
+                <p>No common EXIF data found.</p>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
+
+    <!-- Feedback Section -->
+    <div class="bg-purple-50 p-6 rounded-lg border border-purple-200 mb-8">
+        <h2 class="text-xl font-semibold text-purple-800 mb-4 flex items-center">
+            <i class="fas fa-comment-dots mr-3 text-2xl"></i> Provide Feedback
+        </h2>
+        <p class="text-gray-700 mb-4">Help us improve! Was the detected shade accurate?</p>
+        <form action="{{ url_for('submit_feedback') }}" method="POST" class="space-y-4">
+            <input type="hidden" name="report_id" value="{{ report_id }}">
+            
+            <div>
+                <label class="inline-flex items-center">
+                    <input type="radio" name="is_correct" value="true" class="form-radio text-purple-600" checked>
+                    <span class="ml-2 text-gray-700">Yes, the shade was correct.</span>
+                </label>
+            </div>
+            <div>
+                <label class="inline-flex items-center">
+                    <input type="radio" name="is_correct" value="false" class="form-radio text-purple-600">
+                    <span class="ml-2 text-gray-700">No, the shade was incorrect.</span>
+                </label>
+            </div>
+
+            <div id="correctShadeInput" class="hidden mt-4">
+                <label for="correct_shade" class="block text-gray-700 text-sm font-bold mb-2">If incorrect, what was the correct shade?</label>
+                <input type="text" name="correct_shade" id="correct_shade" class="form-input" placeholder="e.g., A2, B1">
+            </div>
+
+            <button type="submit" class="btn-primary flex items-center justify-center">
+                <i class="fas fa-paper-plane mr-2"></i> Submit Feedback
+            </button>
+        </form>
+    </div>
+
+    <div class="mt-8 text-center">
+        <a href="{{ url_for('dashboard') }}" class="text-indigo-600 hover:text-indigo-800 text-sm font-semibold transition duration-150 ease-in-out">
+            <i class="fas fa-arrow-left mr-2"></i> Back to Dashboard
+        </a>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const radioButtons = document.querySelectorAll('input[name="is_correct"]');
+        const correctShadeInputDiv = document.getElementById('correctShadeInput');
+        const correctShadeInput = document.getElementById('correct_shade');
+
+        function toggleCorrectShadeInput() {
+            if (document.querySelector('input[name="is_correct"][value="false"]').checked) {
+                correctShadeInputDiv.classList.remove('hidden');
+                correctShadeInput.setAttribute('required', 'required');
+            } else {
+                correctShadeInputDiv.classList.add('hidden');
+                correctShadeInput.removeAttribute('required');
+                correctShadeInput.value = ''; // Clear value when hidden
+            }
+        }
+
+        radioButtons.forEach(radio => {
+            radio.addEventListener('change', toggleCorrectShadeInput);
+        });
+
+        // Initial check on page load
+        toggleCorrectShadeInput();
+    });
+</script>
+{% endblock %}
