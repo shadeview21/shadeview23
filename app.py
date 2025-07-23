@@ -16,13 +16,13 @@ from flask import Flask, render_template, request, redirect, url_for, flash, ses
 from werkzeug.utils import secure_filename
 
 # --- SQLModel for Database ORM ---
-# You need to install these: pip install sqlmodel psycopg2-binary
+# You need to install these: pip install sqlmodel mysqlclient
 from sqlmodel import Field, Session, SQLModel, create_engine, select
 from typing import Optional, List
 
-# --- CRITICAL IMPORTS FOR JSONB TYPE ---
+# --- CRITICAL IMPORTS FOR JSON TYPE (MySQL) ---
 from sqlalchemy import Column # For defining SQLAlchemy columns directly
-from sqlalchemy.dialects.postgresql import JSONB # For JSONB column type in PostgreSQL
+from sqlalchemy.dialects.mysql import JSON # For JSON column type in MySQL
 # --- END CRITICAL IMPORTS ---
 
 # --- Custom LabColor class ---
@@ -440,14 +440,14 @@ def detect_face_features(image_np_array):
     elif avg_l_img < 55:
         skin_tone_category = "Dark"
     if avg_b_img > 18 and avg_a_img > 10:
-        skin_undertone = "Warm (Golden/Peach)"
+        skin_undertone = "Warm (Golden/Peach) undertones"
     elif avg_b_img < 10 and avg_a_img < 5:
-        skin_undertone = "Cool (Pink/Blue)"
+        skin_undertone = "Cool (Pink/Blue) undertones"
     elif avg_b_img >= 10 and avg_b_img <= 18 and avg_a_img >= 5 and avg_a_img <= 10:
-        skin_undertone = "Neutral"
+        skin_undertone = "Neutral undertones"
     elif avg_b_img > 15 and avg_a_img < 5:
-        skin_undertone = "Olive (Greenish)"
-    simulated_skin_tone = f"{skin_tone_category} with {skin_undertone} undertones"
+        skin_undertone = "Olive (Greenish) undertones"
+    simulated_skin_tone = f"{skin_tone_category} with {skin_undertone}"
     simulated_lip_color = np.random.choice(["Natural Pink", "Deep Rosy Red", "Bright Coral", "Subtle Mauve/Berry", "Pale Nude"])
     eye_contrast_sim = np.random.choice(["High (Distinct Features)", "Medium", "Low (Soft Features)"])
     return {
@@ -723,7 +723,7 @@ def detect_shades_from_image(image_path, selected_reference_tab="neutral_gray", 
     try:
         # Calculate initial sharpness before any processing
         initial_image_sharpness = calculate_image_sharpness(img)
-        print(f"DEBUG: Initial Image Sharpness: {initial_image_sharpness:.2f}")
+        # print(f"DEBUG: Initial Image Sharpness: {initial_image_sharpness:.2f}")
 
         # Step 1: Preprocess image (resize)
         img = preprocess_image(img, target_size=(512, 512)) 
@@ -1104,18 +1104,20 @@ os.makedirs(REPORT_FOLDER, exist_ok=True)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['REPORT_FOLDER'] = REPORT_FOLDER
 
-# --- Database Setup (PostgreSQL with SQLModel) ---
+# --- Database Setup (MySQL with SQLModel) ---
 # This URL will be provided by Render as an environment variable
+# Example MySQL URL: mysql+mysqlconnector://user:password@host:port/database_name
+# Or with mysqlclient: mysql+mysqldb://user:password@host:port/database_name
 DATABASE_URL = os.environ.get("DATABASE_URL")
 if not DATABASE_URL:
     # Fallback for local development if DATABASE_URL is not set
-    # For local testing, you might use a local PostgreSQL or SQLite:
-    # For SQLite: DATABASE_URL = "sqlite:///./database.db" (creates a file-based DB)
-    # For local PostgreSQL: DATABASE_URL = "postgresql://user:password@localhost:5432/dbname"
+    # For local MySQL: DATABASE_URL = "mysql+mysqlclient://root:password@localhost:3306/shadeview_db"
     print("WARNING: DATABASE_URL environment variable not set. Using SQLite for local testing fallback.")
     DATABASE_URL = "sqlite:///./database.db" # Using SQLite for simple local fallback
 
-engine = create_engine(DATABASE_URL, echo=False) # echo=True for SQL logging (useful for debug), set to False for production
+# Note: For MySQL, you might need to specify `pool_pre_ping=True` for long-running apps
+# to prevent "MySQL has gone away" errors.
+engine = create_engine(DATABASE_URL, echo=False, pool_pre_ping=True) # echo=True for SQL logging (useful for debug), set to False for production
 
 def create_db_and_tables():
     """Creates all database tables defined by SQLModel."""
@@ -1154,8 +1156,8 @@ class Report(SQLModel, table=True):
     op_number: str = Field(index=True) # For direct lookup by OP number
     original_image: str # Filename of the uploaded image
     report_filename: str # Filename of the generated PDF report
-    # FIX: Use sa_column=Column(JSONB) for JSONB column type directly for PostgreSQL
-    detected_shades: dict = Field(default_factory=dict, sa_column=Column(JSONB)) # Store dict as JSONB in Postgres
+    # CRITICAL FIX: Use Column(JSON) from mysql.dialects for MySQL JSON type
+    detected_shades: dict = Field(default_factory=dict, sa_column=Column(JSON)) # Store dict as JSON in MySQL
     timestamp: datetime = Field(default_factory=datetime.now)
 
 # --- END Database Models ---
@@ -1173,7 +1175,7 @@ def uploaded_file(filename):
 
 
 # ===============================================
-# 2. AUTHENTICATION HELPERS (Adapted for PostgreSQL)
+# 2. AUTHENTICATION HELPERS (Adapted for MySQL)
 # ===============================================
 
 @app.before_request
@@ -1215,7 +1217,7 @@ def login_required(view):
 
 
 # ===============================================
-# 3. ROUTES (Adapted for PostgreSQL)
+# 3. ROUTES (Adapted for MySQL)
 # ===============================================
 @app.route('/')
 def home():
@@ -1507,7 +1509,7 @@ def report_page(report_filename):
                 patient_name = patient.patient_name
     
     analysis_date = report_data.timestamp.strftime('%Y-%m-%d %H:%M:%S')
-    shades = report_data.detected_shades # This is already a dict from JSONB
+    shades = report_data.detected_shades # This is already a dict from JSON
     image_filename = report_data.original_image
     report_id = report_data.id # Use the SQLModel ID
 
@@ -1571,7 +1573,7 @@ def submit_feedback():
             # Find the report to update
             report_to_update = session.get(Report, report_id)
             if report_to_update and report_to_update.user_id == user_id:
-                # Add feedback directly to the report's detected_shades dictionary (JSONB)
+                # Add feedback directly to the report's detected_shades dictionary (JSON)
                 # This is a simplified way to store feedback for a report.
                 # In a more complex system, you might have a separate Feedback table.
                 if 'feedback' not in report_to_update.detected_shades:
