@@ -1,9 +1,10 @@
-Flask
-numpy
-opencv-python
-Pillow
-scikit-image
-fpdf
-sqlmodel
-mysqlclient
-gunicorn # If you're using Gunicorn for production
+    Flask
+    numpy
+    opencv-python
+    Pillow
+    scikit-image
+    fpdf
+    sqlmodel
+    mysqlclient # This is the key for MySQL
+    gunicorn
+    

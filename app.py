@@ -1106,7 +1106,7 @@ app.config['REPORT_FOLDER'] = REPORT_FOLDER
 
 # --- Database Setup (MySQL with SQLModel) ---
 # This URL will be provided by Render as an environment variable
-# Example MySQL URL: mysql+mysqlconnector://user:password@host:port/database_name
+# Example MySQL URL: mysql+mysqlclient://user:password@host:port/database_name
 # Or with mysqlclient: mysql+mysqldb://user:password@host:port/database_name
 DATABASE_URL = os.environ.get("DATABASE_URL")
 if not DATABASE_URL:
