@@ -16,14 +16,12 @@ from flask import Flask, render_template, request, redirect, url_for, flash, ses
 from werkzeug.utils import secure_filename
 
 # --- SQLModel for Database ORM ---
-# You need to install these: pip install sqlmodel mysqlclient
+# You need to install these: pip install sqlmodel
 from sqlmodel import Field, Session, SQLModel, create_engine, select
 from typing import Optional, List
 
-# --- CRITICAL IMPORTS FOR JSON TYPE (MySQL) ---
-from sqlalchemy import Column # For defining SQLAlchemy columns directly
-from sqlalchemy.dialects.mysql import JSON # For JSON column type in MySQL
-# --- END CRITICAL IMPORTS ---
+# --- No special JSON import needed for SQLite with SQLModel ---
+# SQLModel handles dicts for SQLite by serializing to TEXT
 
 # --- Custom LabColor class ---
 class LabColor:
@@ -1104,20 +1102,16 @@ os.makedirs(REPORT_FOLDER, exist_ok=True)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['REPORT_FOLDER'] = REPORT_FOLDER
 
-# --- Database Setup (MySQL with SQLModel) ---
-# This URL will be provided by Render as an environment variable
-# Example MySQL URL: mysql+mysqlclient://user:password@host:port/database_name
-# Or with mysqlclient: mysql+mysqldb://user:password@host:port/database_name
-DATABASE_URL = os.environ.get("DATABASE_URL")
-if not DATABASE_URL:
-    # Fallback for local development if DATABASE_URL is not set
-    # For local MySQL: DATABASE_URL = "mysql+mysqlclient://root:password@localhost:3306/shadeview_db"
-    print("WARNING: DATABASE_URL environment variable not set. Using SQLite for local testing fallback.")
-    DATABASE_URL = "sqlite:///./database.db" # Using SQLite for simple local fallback
+# --- Database Setup (SQLite with SQLModel) ---
+# Use Render's persistent storage for the SQLite database file
+DATABASE_FILE_PATH = "/var/data/shadeview.db" 
+DATABASE_URL = f"sqlite:///{DATABASE_FILE_PATH}"
 
-# Note: For MySQL, you might need to specify `pool_pre_ping=True` for long-running apps
-# to prevent "MySQL has gone away" errors.
-engine = create_engine(DATABASE_URL, echo=False, pool_pre_ping=True) # echo=True for SQL logging (useful for debug), set to False for production
+# Ensure the directory for the database file exists
+# This is crucial for Render's persistent storage
+os.makedirs(os.path.dirname(DATABASE_FILE_PATH), exist_ok=True)
+
+engine = create_engine(DATABASE_URL, echo=False) # echo=True for SQL logging (useful for debug), set to False for production
 
 def create_db_and_tables():
     """Creates all database tables defined by SQLModel."""
@@ -1156,8 +1150,8 @@ class Report(SQLModel, table=True):
     op_number: str = Field(index=True) # For direct lookup by OP number
     original_image: str # Filename of the uploaded image
     report_filename: str # Filename of the generated PDF report
-    # CRITICAL FIX: Use Column(JSON) from mysql.dialects for MySQL JSON type
-    detected_shades: dict = Field(default_factory=dict, sa_column=Column(JSON)) # Store dict as JSON in MySQL
+    # SQLModel automatically handles dicts for SQLite by serializing to TEXT
+    detected_shades: dict = Field(default_factory=dict) 
     timestamp: datetime = Field(default_factory=datetime.now)
 
 # --- END Database Models ---
@@ -1175,7 +1169,7 @@ def uploaded_file(filename):
 
 
 # ===============================================
-# 2. AUTHENTICATION HELPERS (Adapted for MySQL)
+# 2. AUTHENTICATION HELPERS (Adapted for SQLite)
 # ===============================================
 
 @app.before_request
@@ -1217,7 +1211,7 @@ def login_required(view):
 
 
 # ===============================================
-# 3. ROUTES (Adapted for MySQL)
+# 3. ROUTES (Adapted for SQLite)
 # ===============================================
 @app.route('/')
 def home():
@@ -1460,7 +1454,7 @@ def upload_file():
                             op_number=op_number_from_form,
                             original_image=unique_filename,
                             report_filename=report_filename,
-                            detected_shades=detected_shades # SQLModel handles JSON for dicts
+                            detected_shades=detected_shades # SQLModel handles dicts for SQLite
                         )
                         session.add(report)
                         session.commit() # Commit to save the report
